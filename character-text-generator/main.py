@@ -38,3 +38,19 @@ def tanh(input, derivative = False):
 
 def softmax(input):
     return np.exp(input) / np.sum(np.exp(input))
+
+##### Recurrent Neural Network Class #####
+class RNN:
+    def __init__(self, input_size, hidden_size, output_size, num_epochs, learning_rate):
+        # Hyperparameters
+        self.learning_rate = learning_rate
+        self.num_epochs = num_epochs
+
+        # Network
+        self.w1 = initWeights(input_size, hidden_size)
+        self.w2 = initWeights(input_size, hidden_size)
+        self.w3 = initWeights(hidden_size, output_size)
+
+        self.b2 = np.zeros((1, hidden_size))
+        self.b3 = np.zeros((1, output_size))
+        
