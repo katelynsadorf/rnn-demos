@@ -18,3 +18,13 @@ idx_to_char = {i : ch for ch, i in enumerate(vocab)}
 train_X_idx = [char_to_idx[ch] for ch in train_X]
 train_Y_idx = [char_to_idx[ch] for ch in train_Y]
 
+##### Helper Functions #####
+
+def one_hot(index, vocab_size):
+    vec = np.zeros((vocab_size,))
+    vec[index] = 1
+    return vec
+
+# Xavier Normalized Initialization
+def initWeights(input_size, output_size):
+    return np.random.uniform(-1, 1, (input_size, output_size)) * np.sqrt(6 / (input_size + output_size))
