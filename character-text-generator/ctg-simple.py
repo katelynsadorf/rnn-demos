@@ -13,7 +13,7 @@ vocab = sorted(list(set(train_X + train_Y + test_X +test_Y)))
 vocab_size = len(vocab)
 
 char_to_idx = {ch : i for i, ch in enumerate(vocab)}
-idx_to_char = {i : ch for ch, i in enumerate(vocab)}
+idx_to_char = {i : ch for i, ch in enumerate(vocab)}
 
 train_X_idx = [char_to_idx[ch] for ch in train_X]
 train_Y_idx = [char_to_idx[ch] for ch in train_Y]
@@ -32,12 +32,14 @@ def initWeights(input_size, output_size):
 ##### Activation Functions ######
 def tanh(input, derivative = False):
     if derivative:
-        return 1 - (input ** 2)
+        return 1 - np.tanh(input) ** 2
     
     return np.tanh(input)
 
-def softmax(input):
-    return np.exp(input) / np.sum(np.exp(input))
+def softmax(x):
+    x = x - np.max(x, axis=-1, keepdims=True)
+    exp_x = np.exp(x)
+    return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
 
 ##### Recurrent Neural Network Class #####
 class RNN:
@@ -48,7 +50,7 @@ class RNN:
 
         # Network
         self.w1 = initWeights(input_size, hidden_size)
-        self.w2 = initWeights(input_size, hidden_size)
+        self.w2 = initWeights(hidden_size, hidden_size)
         self.w3 = initWeights(hidden_size, output_size)
 
         self.b2 = np.zeros((1, hidden_size))
@@ -57,14 +59,20 @@ class RNN:
     # Forward Propogation
     def forward(self, inputs):
         self.hidden_states = [np.zeros_like(self.b2)]
+        self.pre_activations = []
 
         for input in inputs:
             layer1_output = np.dot(input, self.w1)
             layer2_output = np.dot(self.hidden_states[-1], self.w2) + self.b2
 
-            self.hidden_states += [tanh(layer1_output +layer2_output)]
+            pre_activation = layer1_output + layer2_output
+            self.pre_activations.append(pre_activation)
 
-        return np.dot(self.hidden_states[-1, self.w3] + self.b3)
+            new_hidden = tanh(pre_activation)
+            self.hidden_states.append(new_hidden.reshape(1, -1))
+
+
+        return np.dot(self.hidden_states[-1], self.w3) + self.b3
 
     # Backward Propogation
     def backward(self, error, inputs):
@@ -77,7 +85,7 @@ class RNN:
 
         d_hidden_state = np.dot(error, self.w3.T)
         for q in reversed(range(len(inputs))):
-            d_hidden_state *= tanh(self.hidden_states[q + 1], derivative = True)
+            d_hidden_state *= tanh(self.pre_activations[q], derivative = True)
 
             d_b2 += d_hidden_state
 
@@ -103,16 +111,17 @@ class RNN:
                 x_idx = char_to_idx[x_char]
                 y_idx = char_to_idx[y_char]
 
-                x_vec = one_hot(x_idx, vocab_size)
+                x_vec = one_hot(x_idx, vocab_size).reshape(1, -1)
                 y_true = y_idx
 
-                y_pred = self.forward(x_vec)
+                y_pred = self.forward([x_vec])
 
-                probs = softmax(y_pred)
+                probs = softmax(y_pred).flatten()
                 error = probs.copy()
                 error[y_true] -= 1
+                error = error.reshape(1, -1)
 
-                self.backward(error, x_vec)
+                self.backward(error, [x_vec])
 
     # Test
     def test(self, inputs, labels):
@@ -125,12 +134,11 @@ class RNN:
             x_idx = char_to_idx[x_char]
             y_idx = char_to_idx[y_char]
 
-            x_vec = one_hot(x_idx, vocab_size)
-            x_vec = x_vec.reshape(-1, 1)
-
-            y_pred = self.forward(x_vec)
+            x_vec = one_hot(x_idx, vocab_size).reshape(1, -1)
+            y_pred = self.forward([x_vec])
 
             pred_idx = np.argmax(y_pred)
+            pred_idx = int(pred_idx)
             pred_char = idx_to_char[pred_idx]
 
             print(f"Predicted: {pred_char}, Expected: {y_char}")
@@ -141,3 +149,13 @@ class RNN:
         accuracy = correct / total
         print(f"\nTest Accuracy: {accuracy * 100:.2f}%")
 
+# Initialize Network
+rnn = RNN(input_size=vocab_size, hidden_size=64, output_size=vocab_size, num_epochs=1000, learning_rate=0.01)
+
+##### Training #####
+print("Starting training...")
+rnn.train(train_X, train_Y)
+
+##### Testing #####
+print("Testing...")
+rnn.test(test_X, test_Y)
